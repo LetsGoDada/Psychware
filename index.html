@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Psychware // Survival Horror Campaign</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background-color: #030305;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+        }
+        #canvas-container {
+            width: 100%; height: 100%;
+            display: block;
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 1;
+            cursor: crosshair;
+        }
+        #crt-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 3px 100%;
+            z-index: 10;
+        }
+        #jumpscare-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #000000;
+            z-index: 999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        #jumpscare-eyes {
+            display: none;
+            color: #ff0000;
+            font-size: 90px;
+            letter-spacing: 40px;
+            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+        }
+        #ui {
+            position: absolute;
+            top: 20px; left: 20px;
+            color: #00ff66;
+            text-shadow: 0 0 5px #00ff66;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .hud-element {
+            margin-bottom: 8px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px; height: 6px;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            z-index: 20;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="crt-overlay"></div>
+    <div id="crosshair"></div>
+    
+    <div id="jumpscare-screen">
+        <div id="jumpscare-eyes">◆ ◆</div>
+    </div>
+    
+    <div id="ui">
+        <div class="hud-element" id="stage-text">STAGE 1: SECURE DATA DISKS</div>
+        <div class="hud-element">OBJECTIVE: <span id="objective-count">0</span> / 4</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <!-- CDN Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        let scene, camera, renderer, audioCtx;
+        
+        // Jumpscare Audio Asset Setup
+        const jumpscareAudio = new Audio('./assets/audio/jumpscare.mp3');
+        jumpscareAudio.volume = 0.3; // Etwas leiser eingestellt (anpassbar)
+
+        const player = {
+            x: 0, z: 0,
+            angle: 0,
+            speed: 0.08,
+            sprintMultiplier: 1.6,
+            stage: 1,
+            progress: 0,
+            isJumpscaring: false
+        };
+
+        const keys = { w: false, a: false, s: false, d: false, shift: false };
+        let walls = [], collectables = [];
+        
+        let watcherGroup;
+        const watcher = { x: -25, z: -25, active: false, timer: 0 };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initAudio();
+            initEngine();
+        });
+
+        function initAudio() {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            } catch(e) { console.log("Audio Init Warning:", e); }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const now = audioCtx.currentTime;
+
+            if (type === 'pickup') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'stageclear') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.4);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(now); osc.stop(now + 0.4);
+            }
+        }
+
+        function triggerWatcherJumpscare() {
+            if (player.isJumpscaring) return;
+            player.isJumpscaring = true;
+            watcher.active = false;
+            watcherGroup.position.set(0, -100, 0);
+
+            const screen = document.getElementById('jumpscare-screen');
+            const eyes = document.getElementById('jumpscare-eyes');
+            
+            // 1. Bildschirm wird sofort schwarz
+            screen.style.display = 'flex';
+            screen.style.background = '#000000';
+            eyes.style.display = 'none';
+
+            // 2. Nach 1.5 Sekunden tauchen die roten Augen im Schwarz auf
+            setTimeout(() => {
+                eyes.style.display = 'block';
+            }, 1500);
+
+            // 3. Nach weiteren ca. 200ms schaltet der Bildschirm auf Rot und das echte Sound-Asset startet synchron
+            const redDuration = 0.5; // Dauer der roten Phase
+            setTimeout(() => {
+                screen.style.background = '#ff0000'; // Bildschirm wird rot
+                
+                // Sound abspielen
+                jumpscareAudio.currentTime = 0;
+                jumpscareAudio.play().catch(e => console.log("Audio play error:", e));
+                
+                // Nach Ablauf der roten Phase -> Zweites Mal Schwarz (bis zum Ende)
+                setTimeout(() => {
+                    screen.style.background = '#000000'; // Wieder schwarz
+                    eyes.style.display = 'none';         // Augen weg
+                }, redDuration * 1000);
+
+            }, 1700);
+
+            // 4. Nach insgesamt 4 Sekunden ist der Jumpscare vorbei, Sound stoppt und Spiel läuft normal weiter
+            setTimeout(() => {
+                screen.style.display = 'none';
+                jumpscareAudio.pause();
+                jumpscareAudio.currentTime = 0;
+                player.isJumpscaring = false;
+                watcher.timer = -150; // Cooldown
+            }, 4000);
+        }
+
+        function initEngine() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020205);
+            scene.fog = new THREE.FogExp2(0x020205, 0.11);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            container.appendChild(renderer.domElement);
+
+            const ambientLight = new THREE.AmbientLight(0x111122, 0.2);
+            scene.add(ambientLight);
+
+            const flashlight = new THREE.SpotLight(0xffffff, 3.8, 20, Math.PI / 5, 0.4, 1);
+            flashlight.position.set(0, 0, 0);
+            flashlight.target.position.set(0, 0, -1);
+            camera.add(flashlight);
+            camera.add(flashlight.target);
+            scene.add(camera);
+
+            buildFacility();
+            buildWatcher();
+            loadStage(1);
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', onKeyDown);
+            window.addEventListener('keyup', onKeyUp);
+            
+            container.addEventListener('click', () => {
+                container.requestPointerLock();
+            });
+
+            document.addEventListener('mousemove', onMouseMove);
+
+            animate();
+        }
+
+        function buildFacility() {
+            const floorGeo = new THREE.PlaneGeometry(100, 100);
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x1b1b26, roughness: 0.8 });
+            
+            const floor = new THREE.Mesh(floorGeo, wallMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -1;
+            scene.add(floor);
+
+            const ceiling = new THREE.Mesh(floorGeo, wallMat);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = 4;
+            scene.add(ceiling);
+
+            const wallData = [
+                [0, -25, 100, 2], [0, 25, 100, 2], [-25, 0, 2, 100], [25, 0, 2, 100],
+                [-12, -12, 14, 2], [12, -8, 2, 16], [-8, 8, 16, 2], [10, 12, 12, 2],
+                [0, -12, 2, 10], [-12, 12, 10, 2], [6, -15, 8, 2], [-15, -5, 2, 12],
+                [18, 5, 2, 14], [-18, -18, 8, 2], [18, 18, 8, 2]
+            ];
+
+            const boxGeo = new THREE.BoxGeometry(1, 5, 1);
+            wallData.forEach(data => {
+                const x = data[0], z = data[1], w = data[2], d = data[3];
+                const wallMesh = new THREE.Mesh(boxGeo, wallMat);
+                wallMesh.scale.set(w, 1, d);
+                wallMesh.position.set(x, 1.5, z);
+                scene.add(wallMesh);
+                walls.push({ x: x, z: z, w: w, d: d });
+            });
+        }
+
+        function buildWatcher() {
+            watcherGroup = new THREE.Group();
+
+            const diamondShape = new THREE.Shape();
+            diamondShape.moveTo(0, 0.1);
+            diamondShape.lineTo(0.25, 0);
+            diamondShape.lineTo(0, -0.1);
+            diamondShape.lineTo(-0.25, 0);
+            diamondShape.closePath();
+
+            const diamondGeo = new THREE.ShapeGeometry(diamondShape);
+            const eyeMat = new THREE.MeshBasicMaterial({ 
+                color: 0xff0000, 
+                side: THREE.DoubleSide, 
+                fog: false 
+            });
+
+            const leftEye = new THREE.Mesh(diamondGeo, eyeMat);
+            leftEye.position.set(-0.35, 0, 0);
+
+            const rightEye = new THREE.Mesh(diamondGeo, eyeMat);
+            rightEye.position.set(0.35, 0, 0);
+
+            watcherGroup.add(leftEye);
+            watcherGroup.add(rightEye);
+            watcherGroup.position.set(0, -100, 0);
+            scene.add(watcherGroup);
+        }
+
+        function loadStage(stageNum) {
+            player.stage = stageNum;
+            player.progress = 0;
+            
+            collectables.forEach(c => scene.remove(c.mesh));
+            collectables = [];
+
+            let positions = [];
+            let itemColor = 0x00ffff;
+            let targetCount = 4;
+
+            if (stageNum === 1) {
+                document.getElementById('stage-text').innerText = "STAGE 1: SECURE DATA DISKS";
+                positions = [{x: 18, z: 18}, {x: -18, z: 20}, {x: 20, z: -20}, {x: -20, z: -18}];
+                itemColor = 0x00ffff;
+            } else if (stageNum === 2) {
+                document.getElementById('stage-text').innerText = "STAGE 2: RESTORE POWER CORES";
+                positions = [{x: 15, z: -5}, {x: -15, z: 5}, {x: 5, z: 18}, {x: -5, z: -18}];
+                itemColor = 0xffaa00;
+            } else if (stageNum === 3) {
+                document.getElementById('stage-text').innerText = "STAGE 3: RETRIEVE MASTER KEYCARD";
+                positions = [{x: 0, z: 22}];
+                targetCount = 1;
+                itemColor = 0xff00ff;
+            }
+
+            document.getElementById('objective-count').innerText = `0 / ${targetCount}`;
+
+            positions.forEach(pos => {
+                const geo = stageNum === 3 ? new THREE.BoxGeometry(0.8, 0.2, 0.5) : new THREE.BoxGeometry(0.5, 0.5, 0.1);
+                const mat = new THREE.MeshBasicMaterial({ color: itemColor, fog: false });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(pos.x, 0.5, pos.z);
+                scene.add(mesh);
+                collectables.push({ mesh: mesh, collected: false });
+            });
+        }
+
+        function onKeyDown(e) {
+            if (e.key === 'w' || e.key === 'W') keys.w = true;
+            if (e.key === 's' || e.key === 'S') keys.s = true;
+            if (e.key === 'a' || e.key === 'A') keys.a = true;
+            if (e.key === 'd' || e.key === 'D') keys.d = true;
+            if (e.key === 'Shift') keys.shift = true;
+        }
+        function onKeyUp(e) {
+            if (e.key === 'w' || e.key === 'W') keys.w = false;
+            if (e.key === 's' || e.key === 'S') keys.s = false;
+            if (e.key === 'a' || e.key === 'A') keys.a = false;
+            if (e.key === 'd' || e.key === 'D') keys.d = false;
+            if (e.key === 'Shift') keys.shift = false;
+        }
+        function onMouseMove(e) {
+            if (document.pointerLockElement !== document.getElementById('canvas-container') || player.isJumpscaring) return;
+            const sensitivity = 0.0022;
+            player.angle -= e.movementX * sensitivity;
+        }
+        function onWindowResize() {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function checkCollision(nx, nz) {
+            const radius = 0.6;
+            for (let w of walls) {
+                let minX = w.x - w.w / 2 - radius;
+                let maxX = w.x + w.w / 2 + radius;
+                let minZ = w.z - w.d / 2 - radius;
+                let maxZ = w.z + w.d / 2 + radius;
+                if (nx > minX && nx < maxX && nz > minZ && nz < maxZ) return true;
+            }
+            return false;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (player.isJumpscaring) return;
+
+            let currentSpeed = player.speed * (keys.shift ? player.sprintMultiplier : 1.0);
+            let dx = 0, dz = 0;
+            if (keys.w) { dx -= Math.sin(player.angle) * currentSpeed; dz -= Math.cos(player.angle) * currentSpeed; }
+            if (keys.s) { dx += Math.sin(player.angle) * currentSpeed; dz += Math.cos(player.angle) * currentSpeed; }
+            if (keys.a) { dx -= Math.cos(player.angle) * currentSpeed; dz += Math.sin(player.angle) * currentSpeed; }
+            if (keys.d) { dx += Math.cos(player.angle) * currentSpeed; dz -= Math.sin(player.angle) * currentSpeed; }
+
+            let nextX = player.x + dx;
+            let nextZ = player.z + dz;
+
+            if (!checkCollision(nextX, player.z)) player.x = nextX;
+            if (!checkCollision(player.x, nextZ)) player.z = nextZ;
+
+            camera.position.set(player.x, 1.2, player.z);
+            camera.rotation.y = player.angle;
+
+            let targetMax = player.stage === 3 ? 1 : 4;
+            collectables.forEach(c => {
+                if (!c.collected && Math.hypot(player.x - c.mesh.position.x, player.z - c.mesh.position.z) < 1.3) {
+                    c.collected = true;
+                    c.mesh.visible = false;
+                    player.progress++;
+                    playSound('pickup');
+                    document.getElementById('objective-count').innerText = `${player.progress} / ${targetMax}`;
+
+                    if (player.progress >= targetMax) {
+                        playSound('stageclear');
+                        if (player.stage < 3) {
+                            loadStage(player.stage + 1);
+                        } else {
+                            alert("VICTORY! YOU ESCAPED THE FACILITY ALIVE!");
+                            location.reload();
+                        }
+                    }
+                }
+            });
+
+            // Watcher Spawning & Logic
+            watcher.timer++;
+            if (!watcher.active && watcher.timer > (140 - player.stage * 15)) {
+                watcher.timer = 0;
+                if (Math.random() < 0.8) {
+                    let spawnDist = 16;
+                    let angleOffset = (Math.random() - 0.5) * 0.5;
+                    watcher.x = player.x + Math.sin(player.angle + angleOffset) * spawnDist;
+                    watcher.z = player.z + Math.cos(player.angle + angleOffset) * spawnDist;
+                    watcher.active = true;
+                }
+            }
+
+            if (watcher.active) {
+                watcherGroup.position.set(watcher.x, 1.2, watcher.z);
+                watcherGroup.lookAt(camera.position);
+
+                let dxW = watcher.x - player.x;
+                let dzW = watcher.z - player.z;
+                let angleToWatcher = Math.atan2(-dxW, -dzW);
+                
+                let diff = Math.abs(player.angle - angleToWatcher);
+                diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+
+                if (Math.abs(diff) < 0.35) {
+                    triggerWatcherJumpscare();
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
