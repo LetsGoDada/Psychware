@@ -277,6 +277,63 @@
             { id: 4, name: "Void", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 10000, color: 0xcc00ff, group: null, type: "void", speed: 0.04, damage: 60 }
         ];
 
+        // ==========================================
+        // PSYCHWARE CHEAT-API (BACKDOOR / BRIDGE)
+        // ==========================================
+        window.PsychwareAPI = {
+            setGodmode: (enabled) => {
+                if (typeof player !== 'undefined' && enabled) {
+                    player.hp = player.maxHp;
+                }
+            },
+            
+            setRadar: (enabled) => {
+                if (typeof player !== 'undefined') {
+                    player.radarActive = enabled;
+                    player.radarTimer = enabled ? 999999999 : 0;
+                }
+            },
+            
+            setAntiBlock: (enabled) => {
+                if (typeof player !== 'undefined' && enabled) {
+                    player.doorBlocked = false;
+                }
+            },
+            
+            giveAxe: () => {
+                if (typeof player !== 'undefined') {
+                    player.hasAxe = true;
+                    player.doorBlocked = false;
+                }
+            },
+            
+            disableEntity: (type) => {
+                if (typeof entities !== 'undefined') {
+                    let ent = entities.find(e => e.type === type);
+                    if (ent) {
+                        ent.active = false;
+                        ent.delayMs = 999999999;
+                        if (ent.group) ent.group.position.set(0, -100, 0);
+                    }
+                }
+            },
+
+            setDoorXray: (enabled) => {
+                if (typeof doorMesh !== 'undefined' && doorMesh && doorMesh.material) {
+                    doorMesh.material.color.setHex(enabled ? 0xff00ff : 0xffffff);
+                    doorMesh.material.fog = !enabled;
+                    doorMesh.material.depthTest = !enabled;
+                    doorMesh.renderOrder = enabled ? 9999 : 1;
+                    
+                    if (typeof signMesh !== 'undefined' && signMesh && signMesh.material) {
+                        signMesh.material.fog = !enabled;
+                        signMesh.material.depthTest = !enabled;
+                        signMesh.renderOrder = enabled ? 9999 : 1;
+                    }
+                }
+            }
+        };
+
         window.addEventListener('DOMContentLoaded', () => {
             initAudio();
             initEngine();
