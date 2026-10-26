@@ -254,6 +254,7 @@
             radarActive: false,
             radarTimer: 0,
             radarUsedThisStage: false,
+            stageStartTime: 0, // Für den 45-Sekunden Start-Delay
             isInventoryOpen: false,
             isJumpscaring: false,
             isDead: false,
@@ -276,63 +277,6 @@
             { id: 3, name: "Green (Shadow)", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 12000, color: 0x00ff66, group: null, type: "green", speed: 0.05, targetX: 0, targetZ: 0, damage: 30 },
             { id: 4, name: "Void", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 10000, color: 0xcc00ff, group: null, type: "void", speed: 0.04, damage: 60 }
         ];
-
-        // ==========================================
-        // PSYCHWARE CHEAT-API (BACKDOOR / BRIDGE)
-        // ==========================================
-        window.PsychwareAPI = {
-            setGodmode: (enabled) => {
-                if (typeof player !== 'undefined' && enabled) {
-                    player.hp = player.maxHp;
-                }
-            },
-            
-            setRadar: (enabled) => {
-                if (typeof player !== 'undefined') {
-                    player.radarActive = enabled;
-                    player.radarTimer = enabled ? 999999999 : 0;
-                }
-            },
-            
-            setAntiBlock: (enabled) => {
-                if (typeof player !== 'undefined' && enabled) {
-                    player.doorBlocked = false;
-                }
-            },
-            
-            giveAxe: () => {
-                if (typeof player !== 'undefined') {
-                    player.hasAxe = true;
-                    player.doorBlocked = false;
-                }
-            },
-            
-            disableEntity: (type) => {
-                if (typeof entities !== 'undefined') {
-                    let ent = entities.find(e => e.type === type);
-                    if (ent) {
-                        ent.active = false;
-                        ent.delayMs = 999999999;
-                        if (ent.group) ent.group.position.set(0, -100, 0);
-                    }
-                }
-            },
-
-            setDoorXray: (enabled) => {
-                if (typeof doorMesh !== 'undefined' && doorMesh && doorMesh.material) {
-                    doorMesh.material.color.setHex(enabled ? 0xff00ff : 0xffffff);
-                    doorMesh.material.fog = !enabled;
-                    doorMesh.material.depthTest = !enabled;
-                    doorMesh.renderOrder = enabled ? 9999 : 1;
-                    
-                    if (typeof signMesh !== 'undefined' && signMesh && signMesh.material) {
-                        signMesh.material.fog = !enabled;
-                        signMesh.material.depthTest = !enabled;
-                        signMesh.renderOrder = enabled ? 9999 : 1;
-                    }
-                }
-            }
-        };
 
         window.addEventListener('DOMContentLoaded', () => {
             initAudio();
@@ -769,6 +713,7 @@
             player.totemActive = false;
             player.radarActive = false;
             player.radarUsedThisStage = false;
+            player.stageStartTime = performance.now(); // Timer für den 45s Delay neu starten
             
             let spawn = getGuaranteedSpawnPosition();
             player.x = spawn.x;
@@ -897,6 +842,16 @@
             if (player.isJumpscaring || player.isVictorious || player.isDead || player.isInventoryOpen) return;
 
             let currentTime = performance.now();
+            let elapsedSec = (currentTime - player.stageStartTime) / 1000;
+
+            let isPulsing = false;
+            // Erst nach 45 Sekunden startet der erste Puls, danach alle 20 Sekunden für genau 2 Sekunden
+            if (elapsedSec >= 45) {
+                let timeAfterDelay = elapsedSec - 45;
+                isPulsing = (timeAfterDelay % 20) < 2;
+            }
+
+            let showThroughWalls = player.radarActive || isPulsing;
 
             if (player.totemActive) {
                 if (currentTime >= player.totemTimer) {
@@ -910,26 +865,49 @@
                 }
             }
 
-            let allItemsList = [];
-            collectables.forEach(c => { if(!c.collected) allItemsList.push(c.mesh); });
-            itemEntities.forEach(it => { if(!it.collected) allItemsList.push(it.mesh); });
-            if (puzzleItemMesh && puzzleItemMesh.visible) allItemsList.push(puzzleItemMesh);
-            if (axeItemMesh && axeItemMesh.visible) allItemsList.push(axeItemMesh);
+            // Nur die Schlüssel/Quest-Objekte leuchten lassen (Collectables)
+            let keyItemsList = [];
+            collectables.forEach(c => { if(!c.collected) keyItemsList.push(c.mesh); });
+            if (puzzleItemMesh && puzzleItemMesh.visible) keyItemsList.push(puzzleItemMesh);
+            if (axeItemMesh && axeItemMesh.visible) keyItemsList.push(axeItemMesh);
 
-            allItemsList.forEach(mesh => {
-                if (player.radarActive) {
-                    mesh.material.color.setHex(0x00ffff);
-                    mesh.material.fog = false;
+            keyItemsList.forEach(mesh => {
+                if (showThroughWalls) {
+                    if (!mesh.userData.sonarMat) {
+                        mesh.userData.originalMat = mesh.material;
+                        mesh.userData.sonarMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
+                    }
+                    mesh.material = mesh.userData.sonarMat;
                     mesh.material.depthTest = false;
                     mesh.scale.set(1.8, 1.8, 1.8);
                     mesh.renderOrder = 999;
                 } else {
-                    mesh.material.fog = true;
+                    if (mesh.userData.originalMat) {
+                        mesh.material = mesh.userData.originalMat;
+                    }
                     mesh.material.depthTest = true;
                     mesh.scale.set(1, 1, 1);
                     mesh.renderOrder = 0;
                 }
             });
+
+            // Tür-Puls-Effekt durch Wände
+            if (doorMesh) {
+                if (!doorMesh.userData.originalMat) {
+                    doorMesh.userData.originalMat = doorMesh.material;
+                    doorMesh.userData.sonarMat = new THREE.MeshBasicMaterial({ color: 0x00ff66, fog: false });
+                }
+
+                if (isPulsing) {
+                    doorMesh.material = doorMesh.userData.sonarMat;
+                    doorMesh.material.depthTest = false;
+                    doorMesh.renderOrder = 999;
+                } else {
+                    doorMesh.material = doorMesh.userData.originalMat;
+                    doorMesh.material.depthTest = true;
+                    doorMesh.renderOrder = 0;
+                }
+            }
 
             let currentSpeed = player.speed;
             if (keys.Shift) {
