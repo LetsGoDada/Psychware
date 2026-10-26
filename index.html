@@ -29,6 +29,14 @@
             background-size: 100% 3px, 3px 100%;
             z-index: 10;
         }
+        #pink-vignette {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            box-shadow: inset 0 0 0px rgba(255, 20, 147, 0);
+            z-index: 8;
+            transition: box-shadow 0.1s ease;
+        }
         #jumpscare-screen {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -40,10 +48,98 @@
         }
         #jumpscare-eyes {
             display: none;
-            color: #ff0000;
             font-size: 90px;
             letter-spacing: 40px;
-            text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+            text-shadow: 0 0 20px currentColor, 0 0 40px currentColor;
+        }
+        #inventory-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 3, 8, 0.92);
+            z-index: 950;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #00ff66;
+            text-shadow: 0 0 8px #00ff66;
+        }
+        .inv-box {
+            border: 2px solid #00ff66;
+            background: #080812;
+            padding: 30px;
+            width: 500px;
+            box-shadow: 0 0 15px #00ff66;
+            text-align: center;
+        }
+        .inv-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        .inv-slot {
+            border: 1px dashed #00ff66;
+            height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .inv-slot:hover {
+            background: rgba(0, 255, 102, 0.15);
+            box-shadow: 0 0 8px #00ff66;
+        }
+        #victory-screen, #gameover-screen {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(3, 3, 5, 0.95);
+            z-index: 999;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #00ff66;
+            text-shadow: 0 0 10px #00ff66;
+        }
+        #gameover-screen {
+            color: #ff0033;
+            text-shadow: 0 0 10px #ff0033;
+        }
+        .modal-content {
+            text-align: center;
+        }
+        .modal-content h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            letter-spacing: 8px;
+        }
+        .modal-content p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            color: #ffffff;
+            text-shadow: 0 0 5px #ffffff;
+        }
+        .modal-content button {
+            background: transparent;
+            border: 2px solid currentColor;
+            color: inherit;
+            padding: 12px 25px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 0 8px currentColor;
+            transition: all 0.2s ease;
+        }
+        .modal-content button:hover {
+            background: currentColor;
+            color: #030305;
         }
         #ui {
             position: absolute;
@@ -57,6 +153,20 @@
             margin-bottom: 8px;
             font-size: 16px;
             font-weight: bold;
+        }
+        #health-container {
+            width: 200px;
+            height: 16px;
+            border: 2px solid #00ff66;
+            background: rgba(0, 0, 0, 0.6);
+            margin-bottom: 12px;
+            box-shadow: 0 0 5px #00ff66;
+        }
+        #health-bar {
+            width: 100%;
+            height: 100%;
+            background: #00ff66;
+            transition: width 0.3s ease;
         }
         #crosshair {
             position: absolute;
@@ -72,15 +182,47 @@
 </head>
 <body>
     <div id="crt-overlay"></div>
+    <div id="pink-vignette"></div>
     <div id="crosshair"></div>
     
     <div id="jumpscare-screen">
         <div id="jumpscare-eyes">◆ ◆</div>
     </div>
+
+    <!-- Inventar Overlay (Taste ^) -->
+    <div id="inventory-screen">
+        <div class="inv-box">
+            <h2>SURVIVAL INVENTORY</h2>
+            <p style="font-size: 13px; color: #aaa;">Click an item to use it | Press [^] to close</p>
+            <div class="inv-grid" id="inventory-grid"></div>
+            <button onclick="toggleInventory()" style="background:transparent; border:1px solid #00ff66; color:#00ff66; padding:8px 16px; font-family:'Courier New'; cursor:pointer;">RESUME GAME</button>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen">
+        <div class="modal-content">
+            <h1>VICTORY</h1>
+            <p>YOU SURVIVED ALL 8 LEVELS AND ESCAPED THE FACILITY!</p>
+            <button onclick="location.reload()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen">
+        <div class="modal-content">
+            <h1>YOU DIED</h1>
+            <p>YOUR VITAL SIGNS FLATLINED IN THE FACILITY.</p>
+            <button onclick="location.reload()">RESTART CAMPAIGN</button>
+        </div>
+    </div>
     
     <div id="ui">
-        <div class="hud-element" id="stage-text">STAGE 1: SECURE DATA DISKS</div>
-        <div class="hud-element">OBJECTIVE: <span id="objective-count">0</span> / 4</div>
+        <div class="hud-element" id="stage-text">STAGE 1</div>
+        <div class="hud-element">HEALTH: <span id="health-text">100 HP</span></div>
+        <div id="health-container"><div id="health-bar"></div></div>
+        <div class="hud-element">STATUS: <span id="objective-count">LOCKED (FIND KEY)</span></div>
+        <div class="hud-element">INVENTORY: <span style="color: #aaa; font-size:13px;">Press [^] to open</span></div>
     </div>
 
     <div id="canvas-container"></div>
@@ -89,31 +231,60 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <script>
-        let scene, camera, renderer, audioCtx;
+        let scene, camera, renderer, audioCtx, flashlight;
         
-        // Jumpscare Audio Asset Setup
         const jumpscareAudio = new Audio('./assets/audio/jumpscare.mp3');
-        jumpscareAudio.volume = 0.3; // Etwas leiser eingestellt (anpassbar)
+        jumpscareAudio.volume = 0.06;
 
         const player = {
             x: 0, z: 0,
+            y: 1.2,
             angle: 0,
-            speed: 0.08,
+            speed: 0.045,
             sprintMultiplier: 1.6,
+            crawlMultiplier: 0.45,
             stage: 1,
-            progress: 0,
-            isJumpscaring: false
+            hp: 100,
+            maxHp: 100,
+            hasKey: false,
+            hasAxe: false,
+            doorBlocked: false,
+            totemActive: false,
+            totemTimer: 0,
+            radarActive: false,
+            radarTimer: 0,
+            radarUsedThisStage: false,
+            isInventoryOpen: false,
+            isJumpscaring: false,
+            isDead: false,
+            isVictorious: false,
+            inventory: []
         };
 
-        const keys = { w: false, a: false, s: false, d: false, shift: false };
-        let walls = [], collectables = [];
+        const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false, Shift: false, Control: false };
+
+        let walls = [], wallBoxes = [], collectables = [];
+        let doorMesh, signMesh, wallMaterial, floorMesh, ceilingMesh;
+        let puzzleItemMesh, axeItemMesh;
+        let itemEntities = [];
+        let playerStationaryTime = 0;
         
-        let watcherGroup;
-        const watcher = { x: -25, z: -25, active: false, timer: 0 };
+        const entities = [
+            { id: 0, name: "Watcher", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 15000, color: 0xff0000, group: null, type: "watcher", damage: 5 },
+            { id: 1, name: "Pink", x: 0, z: 0, active: false, lastDespawnTime: 0, initialSpawn: true, delayMs: 120000, color: 0xff1493, group: null, type: "pink", speed: 0.12, damage: 35 },
+            { id: 2, name: "Blue", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 16000, color: 0x1e90ff, group: null, type: "blue", speed: 0.018, damage: 25 },
+            { id: 3, name: "Green (Shadow)", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 12000, color: 0x00ff66, group: null, type: "green", speed: 0.05, targetX: 0, targetZ: 0, damage: 30 },
+            { id: 4, name: "Void", x: 0, z: 0, active: false, lastDespawnTime: 0, delayMs: 10000, color: 0xcc00ff, group: null, type: "void", speed: 0.04, damage: 60 }
+        ];
 
         window.addEventListener('DOMContentLoaded', () => {
             initAudio();
             initEngine();
+            entities.forEach(e => {
+                e.lastDespawnTime = performance.now();
+                if(e.type === "pink") e.initialSpawn = true;
+            });
+            playerStationaryTime = performance.now();
         });
 
         function initAudio() {
@@ -145,52 +316,191 @@
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
                 osc.connect(gain); gain.connect(audioCtx.destination);
                 osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'itemuse') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(500, now + 0.3);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(now); osc.stop(now + 0.3);
             }
         }
 
-        function triggerWatcherJumpscare() {
-            if (player.isJumpscaring) return;
+        function updateHealthUI() {
+            const healthBar = document.getElementById('health-bar');
+            const healthText = document.getElementById('health-text');
+            let pct = Math.max(0, (player.hp / player.maxHp) * 100);
+            healthBar.style.width = pct + '%';
+            healthText.innerText = Math.max(0, player.hp) + ' HP';
+            
+            if (pct < 35) {
+                healthBar.style.background = '#ff0033';
+            } else {
+                healthBar.style.background = '#00ff66';
+            }
+        }
+
+        function toggleInventory() {
+            if (player.isJumpscaring || player.isVictorious || player.isDead) return;
+            player.isInventoryOpen = !player.isInventoryOpen;
+            const invScreen = document.getElementById('inventory-screen');
+            
+            if (player.isInventoryOpen) {
+                document.exitPointerLock();
+                invScreen.style.display = 'flex';
+                renderInventoryGrid();
+            } else {
+                invScreen.style.display = 'none';
+                document.getElementById('canvas-container').requestPointerLock();
+            }
+        }
+
+        function renderInventoryGrid() {
+            const grid = document.getElementById('inventory-grid');
+            grid.innerHTML = '';
+            
+            let radarSlot = document.createElement('div');
+            radarSlot.className = 'inv-slot';
+            if (!player.radarUsedThisStage) {
+                radarSlot.innerHTML = `<b style="color:#00ffff">Scanner Radar</b><br><span style="font-size:10px; color:#aaa;">[30s Key & Item Wallhack]</span>`;
+                radarSlot.onclick = () => useRadarAbility();
+            } else {
+                radarSlot.innerHTML = `<span style="color:#666;">Radar Used (Next Level)</span>`;
+            }
+            grid.appendChild(radarSlot);
+
+            for (let i = 0; i < 5; i++) {
+                let slot = document.createElement('div');
+                slot.className = 'inv-slot';
+                if (player.inventory[i]) {
+                    let item = player.inventory[i];
+                    slot.innerHTML = `<b style="color:${item.color}">${item.name}</b><br><span style="font-size:10px; color:#aaa;">[Click to Use]</span>`;
+                    slot.onclick = () => useInventoryItem(i);
+                } else {
+                    slot.innerHTML = `<span style="color:#444;">EMPTY</span>`;
+                }
+                grid.appendChild(slot);
+            }
+        }
+
+        function useRadarAbility() {
+            if (player.radarUsedThisStage) return;
+            player.radarUsedThisStage = true;
+            player.radarActive = true;
+            player.radarTimer = performance.now() + 30000;
+            playSound('itemuse');
+            toggleInventory();
+        }
+
+        function useInventoryItem(index) {
+            let item = player.inventory[index];
+            if (!item) return;
+
+            if (item.type === 'totem') {
+                player.totemActive = true;
+                player.totemTimer = performance.now() + 30000;
+                playSound('itemuse');
+                entities.forEach(e => {
+                    e.active = false;
+                    if (e.group) e.group.position.set(0, -100, 0);
+                    e.lastDespawnTime = performance.now() + 30000;
+                });
+                player.inventory.splice(index, 1);
+            } else if (item.type === 'energy') {
+                player.speed *= 1.4;
+                player.sprintMultiplier *= 1.3;
+                playSound('itemuse');
+                setTimeout(() => {
+                    player.speed /= 1.4;
+                    player.sprintMultiplier /= 1.3;
+                }, 15000);
+                player.inventory.splice(index, 1);
+            } else if (item.type === 'battery') {
+                flashlight.distance = 90;
+                flashlight.intensity = 7.5;
+                playSound('itemuse');
+                setTimeout(() => {
+                    flashlight.distance = 45;
+                    flashlight.intensity = 4.2;
+                }, 20000);
+                player.inventory.splice(index, 1);
+            } else if (item.type === 'health') {
+                if (player.hp < player.maxHp) {
+                    player.hp = Math.min(player.maxHp, player.hp + 30);
+                    updateHealthUI();
+                    playSound('itemuse');
+                    player.inventory.splice(index, 1);
+                }
+            }
+
+            renderInventoryGrid();
+        }
+
+        function triggerJumpscare(entity) {
+            if (player.isJumpscaring || player.isVictorious || player.isDead || player.totemActive) return;
             player.isJumpscaring = true;
-            watcher.active = false;
-            watcherGroup.position.set(0, -100, 0);
+            
+            player.hp -= entity.damage;
+            updateHealthUI();
+
+            keys.KeyW = false; keys.KeyS = false; keys.KeyA = false; keys.KeyD = false; keys.Shift = false; keys.Control = false;
+
+            if (entity.type === "blue") {
+                player.doorBlocked = true;
+                player.hasAxe = false;
+                document.getElementById('objective-count').innerText = "DOOR BLOCKED! FIND PUZZLE & AXE";
+            }
+
+            if (entity.type === "pink") {
+                entity.active = false;
+                entity.group.position.set(0, -100, 0);
+                entity.initialSpawn = false;
+                entity.lastDespawnTime = performance.now();
+            } else {
+                entities.forEach(e => {
+                    e.active = false;
+                    if (e.group) e.group.position.set(0, -100, 0);
+                    e.lastDespawnTime = performance.now();
+                });
+            }
 
             const screen = document.getElementById('jumpscare-screen');
             const eyes = document.getElementById('jumpscare-eyes');
             
-            // 1. Bildschirm wird sofort schwarz
             screen.style.display = 'flex';
             screen.style.background = '#000000';
             eyes.style.display = 'none';
+            eyes.style.color = '#' + entity.color.toString(16).padStart(6, '0');
 
-            // 2. Nach 1.5 Sekunden tauchen die roten Augen im Schwarz auf
             setTimeout(() => {
                 eyes.style.display = 'block';
             }, 1500);
 
-            // 3. Nach weiteren ca. 200ms schaltet der Bildschirm auf Rot und das echte Sound-Asset startet synchron
-            const redDuration = 0.5; // Dauer der roten Phase
+            const redDuration = 0.5;
             setTimeout(() => {
-                screen.style.background = '#ff0000'; // Bildschirm wird rot
-                
-                // Sound abspielen
+                screen.style.background = '#' + entity.color.toString(16).padStart(6, '0');
                 jumpscareAudio.currentTime = 0;
                 jumpscareAudio.play().catch(e => console.log("Audio play error:", e));
                 
-                // Nach Ablauf der roten Phase -> Zweites Mal Schwarz (bis zum Ende)
                 setTimeout(() => {
-                    screen.style.background = '#000000'; // Wieder schwarz
-                    eyes.style.display = 'none';         // Augen weg
+                    screen.style.background = '#000000';
+                    eyes.style.display = 'none';
                 }, redDuration * 1000);
 
             }, 1700);
 
-            // 4. Nach insgesamt 4 Sekunden ist der Jumpscare vorbei, Sound stoppt und Spiel läuft normal weiter
             setTimeout(() => {
                 screen.style.display = 'none';
                 jumpscareAudio.pause();
                 jumpscareAudio.currentTime = 0;
                 player.isJumpscaring = false;
-                watcher.timer = -150; // Cooldown
+
+                if (player.hp <= 0) {
+                    player.isDead = true;
+                    document.exitPointerLock();
+                    document.getElementById('gameover-screen').style.display = 'flex';
+                }
             }, 4000);
         }
 
@@ -199,7 +509,7 @@
             
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x020205);
-            scene.fog = new THREE.FogExp2(0x020205, 0.11);
+            scene.fog = new THREE.FogExp2(0x020205, 0.03);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
@@ -207,10 +517,10 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             container.appendChild(renderer.domElement);
 
-            const ambientLight = new THREE.AmbientLight(0x111122, 0.2);
+            const ambientLight = new THREE.AmbientLight(0x111122, 0.25);
             scene.add(ambientLight);
 
-            const flashlight = new THREE.SpotLight(0xffffff, 3.8, 20, Math.PI / 5, 0.4, 1);
+            flashlight = new THREE.SpotLight(0xffffff, 4.2, 45, Math.PI / 5, 0.4, 1);
             flashlight.position.set(0, 0, 0);
             flashlight.target.position.set(0, 0, -1);
             camera.add(flashlight);
@@ -218,15 +528,39 @@
             scene.add(camera);
 
             buildFacility();
-            buildWatcher();
+            buildAllEntities();
             loadStage(1);
 
             window.addEventListener('resize', onWindowResize);
-            window.addEventListener('keydown', onKeyDown);
-            window.addEventListener('keyup', onKeyUp);
+            
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Backquote' || e.key === '^' || e.key === '°' || e.key === '~') {
+                    toggleInventory();
+                    return;
+                }
+                if (player.isJumpscaring || player.isVictorious || player.isDead || player.isInventoryOpen) return;
+                const k = e.key ? e.key.toLowerCase() : '';
+                if (e.code === 'KeyW' || k === 'w') keys.KeyW = true;
+                if (e.code === 'KeyS' || k === 's') keys.KeyS = true;
+                if (e.code === 'KeyA' || k === 'a') keys.KeyA = true;
+                if (e.code === 'KeyD' || k === 'd') keys.KeyD = true;
+                if (e.code.includes('Shift') || k === 'shift') keys.Shift = true;
+                if (e.code.includes('Control') || k === 'control' || k === 'ctrl') keys.Control = true;
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (player.isInventoryOpen) return;
+                const k = e.key ? e.key.toLowerCase() : '';
+                if (e.code === 'KeyW' || k === 'w') keys.KeyW = false;
+                if (e.code === 'KeyS' || k === 's') keys.KeyS = false;
+                if (e.code === 'KeyA' || k === 'a') keys.KeyA = false;
+                if (e.code === 'KeyD' || k === 'd') keys.KeyD = false;
+                if (e.code.includes('Shift') || k === 'shift') keys.Shift = false;
+                if (e.code.includes('Control') || k === 'control' || k === 'ctrl') keys.Control = false;
+            });
             
             container.addEventListener('click', () => {
-                container.requestPointerLock();
+                if (!player.isJumpscaring && !player.isVictorious && !player.isDead && !player.isInventoryOpen) container.requestPointerLock();
             });
 
             document.addEventListener('mousemove', onMouseMove);
@@ -235,123 +569,253 @@
         }
 
         function buildFacility() {
-            const floorGeo = new THREE.PlaneGeometry(100, 100);
-            const wallMat = new THREE.MeshStandardMaterial({ color: 0x1b1b26, roughness: 0.8 });
+            const floorGeo = new THREE.PlaneGeometry(360, 360);
+            wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1c1c28, roughness: 0.8 });
             
-            const floor = new THREE.Mesh(floorGeo, wallMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.position.y = -1;
-            scene.add(floor);
+            floorMesh = new THREE.Mesh(floorGeo, wallMaterial);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.position.y = -1;
+            scene.add(floorMesh);
 
-            const ceiling = new THREE.Mesh(floorGeo, wallMat);
-            ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = 4;
-            scene.add(ceiling);
+            ceilingMesh = new THREE.Mesh(floorGeo, wallMaterial);
+            ceilingMesh.rotation.x = Math.PI / 2;
+            ceilingMesh.position.y = 4;
+            scene.add(ceilingMesh);
 
-            const wallData = [
-                [0, -25, 100, 2], [0, 25, 100, 2], [-25, 0, 2, 100], [25, 0, 2, 100],
-                [-12, -12, 14, 2], [12, -8, 2, 16], [-8, 8, 16, 2], [10, 12, 12, 2],
-                [0, -12, 2, 10], [-12, 12, 10, 2], [6, -15, 8, 2], [-15, -5, 2, 12],
-                [18, 5, 2, 14], [-18, -18, 8, 2], [18, 18, 8, 2]
+            let wallData = [
+                [0, -180, 360, 4], [0, 180, 360, 4], [-180, 0, 4, 360], [180, 0, 4, 360]
             ];
+
+            for (let x = -160; x <= 160; x += 22) {
+                for (let z = -160; z <= 160; z += 22) {
+                    if (Math.abs(x) < 22 && Math.abs(z) < 22) continue;
+
+                    let chaosOffset = ((x * z) % 7) * 2;
+                    
+                    if ((Math.abs(x) + Math.abs(z)) % 44 === 0) {
+                        wallData.push([x + (chaosOffset % 4), z, 18, 4]);
+                    } else {
+                        wallData.push([x, z + (chaosOffset % 4), 4, 18]);
+                    }
+                }
+            }
 
             const boxGeo = new THREE.BoxGeometry(1, 5, 1);
             wallData.forEach(data => {
                 const x = data[0], z = data[1], w = data[2], d = data[3];
-                const wallMesh = new THREE.Mesh(boxGeo, wallMat);
+                const wallMesh = new THREE.Mesh(boxGeo, wallMaterial);
                 wallMesh.scale.set(w, 1, d);
                 wallMesh.position.set(x, 1.5, z);
                 scene.add(wallMesh);
                 walls.push({ x: x, z: z, w: w, d: d });
+
+                wallBoxes.push({
+                    minX: x - w/2 - 0.5, maxX: x + w/2 + 0.5,
+                    minZ: z - d/2 - 0.5, maxZ: z + d/2 + 0.5
+                });
+            });
+
+            const doorGeo = new THREE.BoxGeometry(2.2, 3.2, 0.4);
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0x444466, roughness: 0.5 });
+            doorMesh = new THREE.Mesh(doorGeo, doorMat);
+            scene.add(doorMesh);
+
+            const signGeo = new THREE.PlaneGeometry(1.5, 0.5);
+            const signMat = new THREE.MeshBasicMaterial({ color: 0xff3300, side: THREE.DoubleSide, fog: false });
+            signMesh = new THREE.Mesh(signGeo, signMat);
+            scene.add(signMesh);
+        }
+
+        function buildAllEntities() {
+            const diamondShape = new THREE.Shape();
+            diamondShape.moveTo(0, 0.12);
+            diamondShape.lineTo(0.3, 0);
+            diamondShape.lineTo(0, -0.12);
+            diamondShape.lineTo(-0.3, 0);
+            diamondShape.closePath();
+            const diamondGeo = new THREE.ShapeGeometry(diamondShape);
+
+            entities.forEach(e => {
+                const group = new THREE.Group();
+                const eyeMat = new THREE.MeshBasicMaterial({ color: e.color, side: THREE.DoubleSide, fog: false });
+
+                const leftEye = new THREE.Mesh(diamondGeo, eyeMat);
+                leftEye.position.set(-0.4, 0, 0);
+                const rightEye = new THREE.Mesh(diamondGeo, eyeMat);
+                rightEye.position.set(0.4, 0, 0);
+
+                group.add(leftEye);
+                group.add(rightEye);
+                group.position.set(0, -100, 0);
+                scene.add(group);
+                e.group = group;
             });
         }
 
-        function buildWatcher() {
-            watcherGroup = new THREE.Group();
+        function hasLineOfSight(x1, z1, x2, z2) {
+            let steps = 35;
+            for (let i = 1; i < steps; i++) {
+                let t = i / steps;
+                let cx = x1 + (x2 - x1) * t;
+                let cz = z1 + (z2 - z1) * t;
+                
+                for (let box of wallBoxes) {
+                    if (cx >= box.minX && cx <= box.maxX && cz >= box.minZ && cz <= box.maxZ) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
 
-            const diamondShape = new THREE.Shape();
-            diamondShape.moveTo(0, 0.1);
-            diamondShape.lineTo(0.25, 0);
-            diamondShape.lineTo(0, -0.1);
-            diamondShape.lineTo(-0.25, 0);
-            diamondShape.closePath();
+        function isInWall(x, z) {
+            const radius = 0.55;
+            for (let box of wallBoxes) {
+                if (x >= box.minX - radius && x <= box.maxX + radius && z >= box.minZ - radius && z <= box.maxZ + radius) {
+                    return true;
+                }
+            }
+            return false;
+        }
 
-            const diamondGeo = new THREE.ShapeGeometry(diamondShape);
-            const eyeMat = new THREE.MeshBasicMaterial({ 
-                color: 0xff0000, 
-                side: THREE.DoubleSide, 
-                fog: false 
-            });
+        function getGuaranteedSpawnPosition() {
+            if (!isInWall(0, 0)) return { x: 0, z: 0 };
+            
+            for (let r = 0.5; r < 50; r += 0.5) {
+                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                    let rx = Math.sin(angle) * r;
+                    let rz = Math.cos(angle) * r;
+                    if (!isInWall(rx, rz)) {
+                        return { x: rx, z: rz };
+                    }
+                }
+            }
+            return { x: 0, z: 0 };
+        }
 
-            const leftEye = new THREE.Mesh(diamondGeo, eyeMat);
-            leftEye.position.set(-0.35, 0, 0);
-
-            const rightEye = new THREE.Mesh(diamondGeo, eyeMat);
-            rightEye.position.set(0.35, 0, 0);
-
-            watcherGroup.add(leftEye);
-            watcherGroup.add(rightEye);
-            watcherGroup.position.set(0, -100, 0);
-            scene.add(watcherGroup);
+        function getRandomSafePosition() {
+            for (let i = 0; i < 500; i++) {
+                let rx = (Math.random() - 0.5) * 280;
+                let rz = (Math.random() - 0.5) * 280;
+                if (!isInWall(rx, rz) && Math.hypot(0 - rx, 0 - rz) > 10) {
+                    return { x: rx, z: rz };
+                }
+            }
+            return { x: -30, z: -30 };
         }
 
         function loadStage(stageNum) {
             player.stage = stageNum;
-            player.progress = 0;
+            player.hasKey = false;
+            player.hasAxe = false;
+            player.doorBlocked = false;
+            player.totemActive = false;
+            player.radarActive = false;
+            player.radarUsedThisStage = false;
+            
+            let spawn = getGuaranteedSpawnPosition();
+            player.x = spawn.x;
+            player.z = spawn.z;
+            
+            player.hp = player.maxHp;
+            updateHealthUI();
             
             collectables.forEach(c => scene.remove(c.mesh));
             collectables = [];
+            itemEntities.forEach(it => scene.remove(it.mesh));
+            itemEntities = [];
 
-            let positions = [];
-            let itemColor = 0x00ffff;
-            let targetCount = 4;
+            if (puzzleItemMesh) { scene.remove(puzzleItemMesh); puzzleItemMesh = null; }
+            if (axeItemMesh) { scene.remove(axeItemMesh); axeItemMesh = null; }
 
-            if (stageNum === 1) {
-                document.getElementById('stage-text').innerText = "STAGE 1: SECURE DATA DISKS";
-                positions = [{x: 18, z: 18}, {x: -18, z: 20}, {x: 20, z: -20}, {x: -20, z: -18}];
-                itemColor = 0x00ffff;
-            } else if (stageNum === 2) {
-                document.getElementById('stage-text').innerText = "STAGE 2: RESTORE POWER CORES";
-                positions = [{x: 15, z: -5}, {x: -15, z: 5}, {x: 5, z: 18}, {x: -5, z: -18}];
-                itemColor = 0xffaa00;
-            } else if (stageNum === 3) {
-                document.getElementById('stage-text').innerText = "STAGE 3: RETRIEVE MASTER KEYCARD";
-                positions = [{x: 0, z: 22}];
-                targetCount = 1;
-                itemColor = 0xff00ff;
+            const stageData = [
+                { title: "STAGE 1: THE WATCHER", wallColor: 0x1c1c28 },
+                { title: "STAGE 2: PINK'S GAUNTLET", wallColor: 0x33221c },
+                { title: "STAGE 3: BLUE'S BARRICADE", wallColor: 0x1c281c },
+                { title: "STAGE 4: SHADOW LABYRINTH", wallColor: 0x1c2828 },
+                { title: "STAGE 5: VOID CHAMBER", wallColor: 0x251c28 },
+                { title: "STAGE 6: DEEP FACILITY", wallColor: 0x28201c },
+                { title: "STAGE 7: PSYCHOTIC MAZE", wallColor: 0x281c28 },
+                { title: "STAGE 8: THE FINAL EXIT", wallColor: 0x181822 }
+            ];
+
+            const currentStage = stageData[stageNum - 1];
+            document.getElementById('stage-text').innerText = currentStage.title;
+            document.getElementById('objective-count').innerText = "LOCKED (FIND KEY)";
+
+            wallMaterial.color.setHex(currentStage.wallColor);
+
+            const possibleDoors = [
+                { x: 0, z: -178.2, rot: 0, signX: 0, signZ: -177.0 },
+                { x: 0, z: 178.2, rot: Math.PI, signX: 0, signZ: 177.0 },
+                { x: -178.2, z: 0, rot: Math.PI/2, signX: -177.0, signZ: 0 },
+                { x: 178.2, z: 0, rot: -Math.PI/2, signX: 177.0, signZ: 0 },
+                { x: 60, z: -178.2, rot: 0, signX: 60, signZ: -177.0 }
+            ];
+            const randomDoor = possibleDoors[Math.floor(Math.random() * possibleDoors.length)];
+            doorMesh.position.set(randomDoor.x, 0.6, randomDoor.z);
+            doorMesh.rotation.y = randomDoor.rot;
+            signMesh.position.set(randomDoor.signX, 2.4, randomDoor.signZ);
+
+            let keyPos = getRandomSafePosition();
+            let keyColors = [0x00ffff, 0xffaa00, 0xff00ff, 0x00ff66, 0xffffff, 0xff3300, 0x33ff00, 0xffffff];
+            const geo = new THREE.BoxGeometry(0.8, 0.6, 0.2);
+            const mat = new THREE.MeshBasicMaterial({ color: keyColors[stageNum - 1], fog: false });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(keyPos.x, 0.2, keyPos.z);
+            scene.add(mesh);
+            collectables.push({ mesh: mesh, collected: false, type: 'key' });
+
+            const allLevelItems = [
+                { name: 'Stasis Totem', type: 'totem', color: 0xffaa00, geo: new THREE.ConeGeometry(0.4, 0.8, 4) },
+                { name: 'Energy Drink', type: 'energy', color: 0x00ffff, geo: new THREE.CylinderGeometry(0.3, 0.3, 0.7, 8) },
+                { name: 'Flash Battery', type: 'battery', color: 0x1e90ff, geo: new THREE.BoxGeometry(0.5, 0.5, 0.5) },
+                { name: 'Health Injector', type: 'health', color: 0xff0033, geo: new THREE.BoxGeometry(0.6, 0.3, 0.3) }
+            ];
+            
+            let template = allLevelItems[(stageNum - 1) % allLevelItems.length];
+            let itemPos = getRandomSafePosition();
+            let itemMat = new THREE.MeshBasicMaterial({ color: template.color, fog: false });
+            let itemMesh = new THREE.Mesh(template.geo, itemMat);
+            itemMesh.position.set(itemPos.x, 0.3, itemPos.z);
+            scene.add(itemMesh);
+            itemEntities.push({ mesh: itemMesh, item: { name: template.name, type: template.type, color: '#' + template.color.toString(16).padStart(6, '0') }, collected: false });
+
+            if (stageNum >= 3) {
+                let pPos = getRandomSafePosition();
+                let aPos = getRandomSafePosition();
+
+                const puzzleGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const puzzleMat = new THREE.MeshBasicMaterial({ color: 0xffff00, fog: false });
+                puzzleItemMesh = new THREE.Mesh(puzzleGeo, puzzleMat);
+                puzzleItemMesh.position.set(pPos.x, 0.2, pPos.z);
+                scene.add(puzzleItemMesh);
+
+                const axeGeo = new THREE.BoxGeometry(0.8, 0.3, 0.1);
+                const axeMat = new THREE.MeshBasicMaterial({ color: 0x8b4513, fog: false });
+                axeItemMesh = new THREE.Mesh(axeGeo, axeMat);
+                axeItemMesh.position.set(aPos.x, 0.2, aPos.z);
+                scene.add(axeItemMesh);
             }
 
-            document.getElementById('objective-count').innerText = `0 / ${targetCount}`;
-
-            positions.forEach(pos => {
-                const geo = stageNum === 3 ? new THREE.BoxGeometry(0.8, 0.2, 0.5) : new THREE.BoxGeometry(0.5, 0.5, 0.1);
-                const mat = new THREE.MeshBasicMaterial({ color: itemColor, fog: false });
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.position.set(pos.x, 0.5, pos.z);
-                scene.add(mesh);
-                collectables.push({ mesh: mesh, collected: false });
+            entities.forEach((e, idx) => {
+                e.active = false;
+                if (e.group) e.group.position.set(0, -100, 0);
+                e.lastDespawnTime = performance.now();
+                if (e.type === "pink") e.initialSpawn = true;
             });
         }
 
-        function onKeyDown(e) {
-            if (e.key === 'w' || e.key === 'W') keys.w = true;
-            if (e.key === 's' || e.key === 'S') keys.s = true;
-            if (e.key === 'a' || e.key === 'A') keys.a = true;
-            if (e.key === 'd' || e.key === 'D') keys.d = true;
-            if (e.key === 'Shift') keys.shift = true;
-        }
-        function onKeyUp(e) {
-            if (e.key === 'w' || e.key === 'W') keys.w = false;
-            if (e.key === 's' || e.key === 'S') keys.s = false;
-            if (e.key === 'a' || e.key === 'A') keys.a = false;
-            if (e.key === 'd' || e.key === 'D') keys.d = false;
-            if (e.key === 'Shift') keys.shift = false;
-        }
         function onMouseMove(e) {
-            if (document.pointerLockElement !== document.getElementById('canvas-container') || player.isJumpscaring) return;
+            if (document.pointerLockElement !== document.getElementById('canvas-container') || player.isJumpscaring || player.isVictorious || player.isDead || player.isInventoryOpen) return;
             const sensitivity = 0.0022;
-            player.angle -= e.movementX * sensitivity;
+
+            let movementX = e.movementX || e.mozMovementX || e.webkitMovementX || 0;
+            movementX = Math.max(-50, Math.min(50, movementX));
+
+            player.angle -= movementX * sensitivity;
         }
+
         function onWindowResize() {
             if (!camera || !renderer) return;
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -360,7 +824,7 @@
         }
 
         function checkCollision(nx, nz) {
-            const radius = 0.6;
+            const radius = 0.55;
             for (let w of walls) {
                 let minX = w.x - w.w / 2 - radius;
                 let maxX = w.x + w.w / 2 + radius;
@@ -373,14 +837,75 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            if (player.isJumpscaring) return;
+            if (player.isJumpscaring || player.isVictorious || player.isDead || player.isInventoryOpen) return;
 
-            let currentSpeed = player.speed * (keys.shift ? player.sprintMultiplier : 1.0);
+            let currentTime = performance.now();
+
+            if (player.totemActive) {
+                if (currentTime >= player.totemTimer) {
+                    player.totemActive = false;
+                }
+            }
+
+            if (player.radarActive) {
+                if (currentTime >= player.radarTimer) {
+                    player.radarActive = false;
+                }
+            }
+
+            let allItemsList = [];
+            collectables.forEach(c => { if(!c.collected) allItemsList.push(c.mesh); });
+            itemEntities.forEach(it => { if(!it.collected) allItemsList.push(it.mesh); });
+            if (puzzleItemMesh && puzzleItemMesh.visible) allItemsList.push(puzzleItemMesh);
+            if (axeItemMesh && axeItemMesh.visible) allItemsList.push(axeItemMesh);
+
+            allItemsList.forEach(mesh => {
+                if (player.radarActive) {
+                    mesh.material.color.setHex(0x00ffff);
+                    mesh.material.fog = false;
+                    mesh.material.depthTest = false;
+                    mesh.scale.set(1.8, 1.8, 1.8);
+                    mesh.renderOrder = 999;
+                } else {
+                    mesh.material.fog = true;
+                    mesh.material.depthTest = true;
+                    mesh.scale.set(1, 1, 1);
+                    mesh.renderOrder = 0;
+                }
+            });
+
+            let currentSpeed = player.speed;
+            if (keys.Shift) {
+                currentSpeed *= player.sprintMultiplier;
+                player.y = THREE.MathUtils.lerp(player.y, 1.2, 0.1);
+            } else if (keys.Control) {
+                currentSpeed *= player.crawlMultiplier;
+                player.y = THREE.MathUtils.lerp(player.y, 0.7, 0.1);
+            } else {
+                player.y = THREE.MathUtils.lerp(player.y, 1.2, 0.1);
+            }
+
             let dx = 0, dz = 0;
-            if (keys.w) { dx -= Math.sin(player.angle) * currentSpeed; dz -= Math.cos(player.angle) * currentSpeed; }
-            if (keys.s) { dx += Math.sin(player.angle) * currentSpeed; dz += Math.cos(player.angle) * currentSpeed; }
-            if (keys.a) { dx -= Math.cos(player.angle) * currentSpeed; dz += Math.sin(player.angle) * currentSpeed; }
-            if (keys.d) { dx += Math.cos(player.angle) * currentSpeed; dz -= Math.sin(player.angle) * currentSpeed; }
+            let playerIsMoving = keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD;
+
+            if (playerIsMoving) {
+                playerStationaryTime = currentTime;
+            } else {
+                if (currentTime - playerStationaryTime >= 2000) {
+                    let pinkEnt = entities.find(e => e.type === "pink");
+                    if (pinkEnt && pinkEnt.active) {
+                        pinkEnt.active = false;
+                        pinkEnt.group.position.set(0, -100, 0);
+                        pinkEnt.initialSpawn = false;
+                        pinkEnt.lastDespawnTime = currentTime; 
+                    }
+                }
+            }
+
+            if (keys.KeyW) { dx -= Math.sin(player.angle) * currentSpeed; dz -= Math.cos(player.angle) * currentSpeed; }
+            if (keys.KeyS) { dx += Math.sin(player.angle) * currentSpeed; dz += Math.cos(player.angle) * currentSpeed; }
+            if (keys.KeyA) { dx -= Math.cos(player.angle) * currentSpeed; dz += Math.sin(player.angle) * currentSpeed; }
+            if (keys.KeyD) { dx += Math.cos(player.angle) * currentSpeed; dz -= Math.sin(player.angle) * currentSpeed; }
 
             let nextX = player.x + dx;
             let nextZ = player.z + dz;
@@ -388,56 +913,182 @@
             if (!checkCollision(nextX, player.z)) player.x = nextX;
             if (!checkCollision(player.x, nextZ)) player.z = nextZ;
 
-            camera.position.set(player.x, 1.2, player.z);
+            camera.position.set(player.x, player.y, player.z);
             camera.rotation.y = player.angle;
 
-            let targetMax = player.stage === 3 ? 1 : 4;
+            let pinkEnt = entities.find(e => e.type === "pink");
+            let pinkVignette = document.getElementById('pink-vignette');
+            if (pinkEnt && pinkEnt.active && !player.totemActive && hasLineOfSight(player.x, player.z, pinkEnt.x, pinkEnt.z)) {
+                let distToPink = Math.hypot(player.x - pinkEnt.x, player.z - pinkEnt.z);
+                let maxVignetteDist = 28;
+                if (distToPink < maxVignetteDist) {
+                    let intensity = Math.max(0, 1 - (distToPink / maxVignetteDist));
+                    pinkVignette.style.boxShadow = `inset 0 0 ${150 * intensity}px rgba(255, 20, 147, ${intensity * 0.85})`;
+                } else {
+                    pinkVignette.style.boxShadow = 'inset 0 0 0px rgba(255, 20, 147, 0)';
+                }
+            } else {
+                pinkVignette.style.boxShadow = 'inset 0 0 0px rgba(255, 20, 147, 0)';
+            }
+
             collectables.forEach(c => {
-                if (!c.collected && Math.hypot(player.x - c.mesh.position.x, player.z - c.mesh.position.z) < 1.3) {
+                if (!c.collected && Math.hypot(player.x - c.mesh.position.x, player.z - c.mesh.position.z) < 1.5) {
                     c.collected = true;
                     c.mesh.visible = false;
-                    player.progress++;
+                    player.hasKey = true;
                     playSound('pickup');
-                    document.getElementById('objective-count').innerText = `${player.progress} / ${targetMax}`;
+                    document.getElementById('objective-count').innerText = player.doorBlocked ? "DOOR BLOCKED! NEED AXE!" : "KEY ACQUIRED (GO TO DOOR)";
+                }
+            });
 
-                    if (player.progress >= targetMax) {
-                        playSound('stageclear');
-                        if (player.stage < 3) {
-                            loadStage(player.stage + 1);
-                        } else {
-                            alert("VICTORY! YOU ESCAPED THE FACILITY ALIVE!");
-                            location.reload();
-                        }
+            itemEntities.forEach(it => {
+                if (!it.collected && Math.hypot(player.x - it.mesh.position.x, player.z - it.mesh.position.z) < 1.5) {
+                    if (player.inventory.length < 5) {
+                        it.collected = true;
+                        it.mesh.visible = false;
+                        player.inventory.push(it.item);
+                        playSound('pickup');
                     }
                 }
             });
 
-            // Watcher Spawning & Logic
-            watcher.timer++;
-            if (!watcher.active && watcher.timer > (140 - player.stage * 15)) {
-                watcher.timer = 0;
-                if (Math.random() < 0.8) {
-                    let spawnDist = 16;
-                    let angleOffset = (Math.random() - 0.5) * 0.5;
-                    watcher.x = player.x + Math.sin(player.angle + angleOffset) * spawnDist;
-                    watcher.z = player.z + Math.cos(player.angle + angleOffset) * spawnDist;
-                    watcher.active = true;
+            if (puzzleItemMesh && puzzleItemMesh.visible && Math.hypot(player.x - puzzleItemMesh.position.x, player.z - puzzleItemMesh.position.z) < 1.5) {
+                puzzleItemMesh.visible = false;
+                if (axeItemMesh) axeItemMesh.visible = true;
+                playSound('pickup');
+                document.getElementById('objective-count').innerText = "PUZZLE SOLVED! FIND THE AXE";
+            }
+
+            if (axeItemMesh && axeItemMesh.visible && Math.hypot(player.x - axeItemMesh.position.x, player.z - axeItemMesh.position.z) < 1.5) {
+                axeItemMesh.visible = false;
+                player.doorBlocked = false;
+                player.hasAxe = true;
+                playSound('pickup');
+                document.getElementById('objective-count').innerText = "AXE ACQUIRED! DOOR UNLOCKED!";
+            }
+
+            if (Math.hypot(player.x - doorMesh.position.x, player.z - doorMesh.position.z) < 1.8) {
+                if (player.hasKey) {
+                    if (player.doorBlocked) {
+                        document.getElementById('objective-count').innerText = "DOOR IS BLOCKED BY BLUE! FIND PUZZLE & AXE!";
+                    } else {
+                        playSound('stageclear');
+                        if (player.stage < 8) {
+                            loadStage(player.stage + 1);
+                        } else {
+                            player.isVictorious = true;
+                            document.exitPointerLock();
+                            document.getElementById('victory-screen').style.display = 'flex';
+                        }
+                    }
                 }
             }
 
-            if (watcher.active) {
-                watcherGroup.position.set(watcher.x, 1.2, watcher.z);
-                watcherGroup.lookAt(camera.position);
+            if (!player.totemActive) {
+                for (let i = 0; i < Math.min(player.stage, entities.length); i++) {
+                    let ent = entities[i];
 
-                let dxW = watcher.x - player.x;
-                let dzW = watcher.z - player.z;
-                let angleToWatcher = Math.atan2(-dxW, -dzW);
-                
-                let diff = Math.abs(player.angle - angleToWatcher);
-                diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                    if (!ent.active) {
+                        let requiredDelay = ent.type === "pink" && ent.initialSpawn ? 15000 : ent.delayMs;
+                        if (currentTime - ent.lastDespawnTime > requiredDelay) {
+                            for (let attempt = 0; attempt < 20; attempt++) {
+                                let angle = Math.random() * Math.PI * 2;
+                                let dist = 20 + Math.random() * 30;
+                                let rx = player.x + Math.sin(angle) * dist;
+                                let rz = player.z + Math.cos(angle) * dist;
 
-                if (Math.abs(diff) < 0.35) {
-                    triggerWatcherJumpscare();
+                                if (!isInWall(rx, rz) && hasLineOfSight(player.x, player.z, rx, rz)) {
+                                    ent.x = rx;
+                                    ent.z = rz;
+                                    ent.active = true;
+                                    ent.targetX = player.x;
+                                    ent.targetZ = player.z;
+                                    break;
+                                }
+                            }
+                            if (!ent.active) {
+                                ent.lastDespawnTime = currentTime - requiredDelay + 3000;
+                            }
+                        }
+                    }
+
+                    if (ent.active) {
+                        let canSeePlayer = hasLineOfSight(ent.x, ent.z, player.x, player.z);
+
+                        if (ent.type === "watcher") {
+                            ent.group.position.set(ent.x, 1.2, ent.z);
+                            ent.group.lookAt(camera.position);
+                        } 
+                        else if (ent.type === "pink") {
+                            if (playerIsMoving && canSeePlayer) {
+                                let edx = player.x - ent.x;
+                                let edz = player.z - ent.z;
+                                let len = Math.hypot(edx, edz);
+                                if (len > 0.8) {
+                                    ent.x += (edx / len) * ent.speed;
+                                    ent.z += (edz / len) * ent.speed;
+                                }
+                            }
+                            ent.group.position.set(ent.x, 1.2, ent.z);
+                            ent.group.lookAt(camera.position);
+                        } 
+                        else if (ent.type === "green") {
+                            let isCrawling = keys.Control;
+                            let isSprinting = keys.Shift;
+
+                            if (playerIsMoving && !isCrawling) {
+                                let edx = player.x - ent.x;
+                                let edz = player.z - ent.z;
+                                let len = Math.hypot(edx, edz);
+                                if (len > 0.5) {
+                                    let speedMultiplier = isSprinting ? 1.4 : 0.8;
+                                    ent.x += (edx / len) * (ent.speed * speedMultiplier);
+                                    ent.z += (edz / len) * (ent.speed * speedMultiplier);
+                                }
+                            } else {
+                                let edx = ent.targetX - ent.x;
+                                let edz = ent.targetZ - ent.z;
+                                let len = Math.hypot(edx, edz);
+                                if (len > 1.0) {
+                                    ent.x += (edx / len) * ent.speed;
+                                    ent.z += (edx / len) * ent.speed;
+                                }
+                            }
+                            ent.group.position.set(ent.x, 1.2, ent.z);
+                            ent.group.lookAt(camera.position);
+                        } 
+                        else {
+                            if (canSeePlayer) {
+                                let edx = player.x - ent.x;
+                                let edz = player.z - ent.z;
+                                let len = Math.hypot(edx, edz);
+                                if (len > 0.8) {
+                                    ent.x += (edx / len) * ent.speed;
+                                    ent.z += (edz / len) * ent.speed;
+                                }
+                            }
+                            ent.group.position.set(ent.x, 1.2, ent.z);
+                            ent.group.lookAt(camera.position);
+                        }
+
+                        if (!canSeePlayer && ent.type !== "green") {
+                            ent.active = false;
+                            ent.group.position.set(0, -100, 0);
+                            ent.initialSpawn = false;
+                            ent.lastDespawnTime = performance.now();
+                        } else {
+                            let distToPlayer = Math.hypot(player.x - ent.x, player.z - ent.z);
+                            let dxE = ent.x - player.x;
+                            let dzE = ent.z - player.z;
+                            let angleToEnt = Math.atan2(-dxE, -dzE);
+                            let diff = Math.abs(player.angle - angleToEnt);
+                            diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+
+                            if (distToPlayer < 2.0 || (Math.abs(diff) < 0.35 && distToPlayer < 8.0 && canSeePlayer)) {
+                                triggerJumpscare(ent);
+                            }
+                        }
+                    }
                 }
             }
 
